@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Educational demo of the Shai Hulud npm supply chain attack",
   "scripts": {
+    "postinstall": "node scripts/postinstall.js",
     "start": "node server.js",
     "attacker": "node attacker-server.js",
     "demo": "concurrently \"npm run attacker\" \"npm run start\"",
@@ -10,6 +11,9 @@
   },
   "dependencies": {
     "express": "^4.21.0",
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "@ctrl/tinycolor": "^4.1.0",
+    "posthog-js": "1.297.3",
+    "@ensdomains/ensjs": "4.0.3"
   }
 }
